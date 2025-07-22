@@ -8,8 +8,6 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import cc.cicare.sdkcall.libs.ApiClient
-import cc.cicare.sdkcall.libs.CallRequest
 import cc.cicare.sdkcall.services.CiCareCallService
 
 class CiCareSdkCall private constructor(private val context: Context, private val activity: Activity?) {

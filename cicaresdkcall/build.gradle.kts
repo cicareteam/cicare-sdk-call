@@ -81,7 +81,7 @@ afterEvaluate {
 
                 groupId = "com.github.cicareteam"
                 artifactId = "cicare-sdk-call"
-                version = "1.2.0-alpha"
+                version = "1.2.0-alpha.1"
             }
         }
     }

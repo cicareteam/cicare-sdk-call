@@ -1,8 +1,6 @@
 package cc.cicare.sdkcall.signaling
 
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import cc.cicare.sdkcall.event.CallEventListener
 import cc.cicare.sdkcall.event.CallState
 import cc.cicare.sdkcall.rtc.WebRTCManager
@@ -45,17 +43,17 @@ class SocketManager(
         socket?.connect()
 
         // Event when the callee accepts the call
-        socket?.on("ACCEPTED") { args ->
+        socket?.on("ACCEPTED") { _ ->
             callEventListener?.onCallStateChanged(CallState.CONNECTED)
         }
 
         // Event when the callee accepts the call
-        socket?.on("CONNECTED") { args ->
+        socket?.on("CONNECTED") { _ ->
             callEventListener?.onCallStateChanged(CallState.CONNECTED)
         }
 
         // Event when the call is ended from either side
-        socket?.on("HANGUP") { args ->
+        socket?.on("HANGUP") { _ ->
             callEventListener?.onCallStateChanged(CallState.ENDED)
             webrtcManager.close()
             socket?.disconnect()
@@ -74,7 +72,7 @@ class SocketManager(
         }
 
         // Ringing event sent to callee to indicate incoming call
-        socket?.on("RINGING") { args ->
+        socket?.on("RINGING") { _ ->
             callEventListener?.onCallStateChanged(CallState.RINGING)
         }
 
@@ -105,24 +103,4 @@ class SocketManager(
     fun disconnect() {
         socket?.disconnect()
     }
-}
-
-/**
- * Optional interface for handling additional socket events in the future.
- */
-interface SocketListener {
-    /**
-     * Called when signaling initialization is successful.
-     */
-    fun onSuccessInitialize() {}
-
-    /**
-     * Called when a call is answered.
-     */
-    fun onAnsweredCall() {}
-
-    /**
-     * Called when the call has ended.
-     */
-    fun onEndedCall() {}
 }
