@@ -109,7 +109,7 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
         val ONGOING_CALL_ICON = android.R.drawable.sym_action_call
         val MISSED_CALL_ICON = android.R.drawable.sym_call_missed
         var OUTGOING_CALL_ICON = android.R.drawable.sym_call_outgoing
-        var ringtoneUrl: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE) }
+        var ringtoneUrl: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) }
 
     override fun onBind(intent: Intent?): IBinder {
         return binder
@@ -339,13 +339,13 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
         initReceive(server, token, isFromPhone)
 
         startForeground(101, notification.build())
-        val isForeground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
-        if (isForeground) {
-            startActivity(Intent(this, ScreenCallActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtras(intent)
-            })
-        }
+//        val isForeground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+//        if (isForeground) {
+//            startActivity(Intent(this, ScreenCallActivity::class.java).apply {
+//                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+//                putExtras(intent)
+//            })
+//        }
     }
 
     private fun onOngoingCall(intent: Intent) {

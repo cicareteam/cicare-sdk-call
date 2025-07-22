@@ -169,6 +169,14 @@ class ScreenCallActivity : ComponentActivity(), CallEventListener, TimeTickerLis
             requestAudioFocus()
         }
 
+        if (intent.action == "INCOMING") {
+            val serviceIntent = Intent(this, CiCareCallService::class.java).apply {
+                action = CiCareCallService.ACTION.INCOMING
+                putExtras(intent) // semua data dari FCM diteruskan
+            }
+            ContextCompat.startForegroundService(this, serviceIntent)
+        }
+
         val callerName = intent.getStringExtra("caller_name") ?: "Unknown"
         val callerAvatar = intent.getStringExtra("caller_avatar") ?: ""
         val calleeName = intent.getStringExtra("callee_name") ?: "unknown"

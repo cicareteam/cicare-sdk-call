@@ -3,6 +3,7 @@ package com.example.myapplication
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -22,6 +23,10 @@ import androidx.lifecycle.lifecycleScope
 import cc.cicare.sdkcall.CiCareSdkCall
 import cc.cicare.sdkcall.services.CiCareCallService
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -46,6 +51,10 @@ class MainActivity : ComponentActivity() {
             "unmute" to "Tidak Bisu",
             "speaker" to "Nyaring",
         )
+//        FirebaseApp.initializeApp(this)
+//        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+//            Log.d("FCM", "Token: $token")
+//        }
         setContent {
             MyApplicationTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->

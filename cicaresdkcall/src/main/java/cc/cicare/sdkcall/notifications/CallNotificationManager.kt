@@ -57,7 +57,7 @@ object CallNotificationManager {
             .build()
 
         return NotificationCompat.Builder(context, channelId)
-            .setFullScreenIntent(screenCallIntent(context, intent, "SCREEN"), true)
+            .setFullScreenIntent(screenCallIntent(context, intent, "INCOMING"), true)
             .setSmallIcon(CiCareCallService.INCOMING_CALL_ICON)
             .setSound(CiCareCallService.ringtoneUrl, AudioManager.STREAM_RING)
             .addPerson(callerProfile)
@@ -176,7 +176,6 @@ object CallNotificationManager {
         intent: Intent,
         callAction: String
     ): PendingIntent {
-        Log.i("CALLSCREEN", "SCREEN")
         val screenIntent = Intent(context, ScreenCallActivity::class.java).apply {
             action = callAction
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP

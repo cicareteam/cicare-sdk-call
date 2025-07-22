@@ -6,6 +6,7 @@ import com.google.firebase.messaging.RemoteMessage
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
+        Log.i("FCM", token)
 //
 //        if (userId != null && userId > 0) {
 //            CoroutineScope(Dispatchers.IO).launch {
@@ -34,17 +35,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val fromPhone = data["from_phone"] ?: "false"
         val server = data["server"] ?: return
 
-        Log.i("APP", "notifikasi masuk $data")
-
-    }
-
-
-
-    companion object {
-        const val ACTION_ANSWER = "ACTION_ANSWER"
-        const val ACTION_DECLINE = "ACTION_DECLINE"
-        const val EXTRA_TOKEN_ANSWER = "token_answer"
-        //private val ringToneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        Log.i("FCM", "notifikasi masuk $data")
 
     }
 }

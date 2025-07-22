@@ -1,13 +1,18 @@
 package cc.cicare.sdkcall
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import cc.cicare.sdkcall.notifications.CallNotificationManager
+import cc.cicare.sdkcall.notifications.ui.ScreenCallActivity
 import cc.cicare.sdkcall.services.CiCareCallService
 
 class CiCareSdkCall private constructor(private val context: Context, private val activity: Activity?) {
@@ -40,6 +45,13 @@ class CiCareSdkCall private constructor(private val context: Context, private va
         }
     }
 
+    private fun hasAllRequiredPermissions(context: Context): Boolean {
+        return requiredPermissions.any {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun showIncoming(callerId: String,
                      callerName: String,
                      callerAvatar: String,
@@ -50,7 +62,18 @@ class CiCareSdkCall private constructor(private val context: Context, private va
                      metaData: Map<String, String> = emptyMap(),
                      tokenCall: String, server: String, isFromPhone: Boolean) {
         val meta: HashMap<String, String> = HashMap(metaData)
-        val intent = Intent(context, CiCareCallService::class.java).apply {
+        val intent = Intent(context, ScreenCallActivity::class.java).apply {
+            action = "INCOMING"
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("call_type", "incoming")
+            putExtra("caller_name", callerName)
+            putExtra("caller_avatar", callerAvatar)
+            putExtra("meta_data", meta)
+            putExtra("token", tokenCall)
+            putExtra("server", server)
+            putExtra("is_from_phone", isFromPhone)
+        }
+        /*val intent = Intent(context, CiCareCallService::class.java).apply {
             action = CiCareCallService.ACTION.INCOMING
             putExtra("call_type", "incoming")
             putExtra("caller_name", callerName)
@@ -60,7 +83,21 @@ class CiCareSdkCall private constructor(private val context: Context, private va
             putExtra("server", server)
             putExtra("is_from_phone", isFromPhone)
         }
-        context.startForegroundService(intent)
+        context.startForegroundService(intent)*/
+        if (hasAllRequiredPermissions(context)) {
+            val notificationManager = CallNotificationManager.provideNotificationmanagerCompat(
+                context, "INCOMING_CALL_CHANNEL",
+                NotificationManagerCompat.IMPORTANCE_MAX
+            )
+            val notify = CallNotificationManager.incomingCallNotificationBuilder(
+                context,
+                intent,
+                "INCOMING_CALL_CHANNEL",
+                callerName,
+                callerAvatar
+            )
+            notificationManager.notify(101, notify.build())
+        }
     }
 
     fun makeCall(callerId: String,
