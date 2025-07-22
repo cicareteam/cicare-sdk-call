@@ -27,8 +27,8 @@ class CiCareSdkCall private constructor(private val context: Context, private va
         android.Manifest.permission.RECORD_AUDIO,
         android.Manifest.permission.FOREGROUND_SERVICE,
         android.Manifest.permission.POST_NOTIFICATIONS,
-        android.Manifest.permission.FOREGROUND_SERVICE_PHONE_CALL,
-        android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE
+        //android.Manifest.permission.FOREGROUND_SERVICE_PHONE_CALL,
+        //android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE
     )
 
     @RequiresApi(Build.VERSION_CODES.S)
