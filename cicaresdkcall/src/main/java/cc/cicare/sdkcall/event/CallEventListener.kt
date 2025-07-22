@@ -35,7 +35,7 @@ enum class CallState {
     /**
      * Call has been answered and media stream is active.
      */
-    ANSWERED,
+    CONNECTED,
 
     /**
      * Call has ended either by remote, local, or due to disconnection.

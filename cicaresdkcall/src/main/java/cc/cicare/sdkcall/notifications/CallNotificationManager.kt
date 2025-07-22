@@ -12,7 +12,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import cc.cicare.sdkcall.notifications.ui.ScreenCallActivity
-import cc.cicare.sdkcall.services.CallAction
 import cc.cicare.sdkcall.services.CiCareCallService
 import dagger.Module
 import dagger.Provides
@@ -28,13 +27,15 @@ object CallNotificationManager {
     @Singleton
     @Provides
     fun provideNotificationmanagerCompat(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        channelId: String,
+        important: Int
     ): NotificationManagerCompat {
         val notificationManager = NotificationManagerCompat.from(context)
         val channel = NotificationChannel(
-            CiCareCallService.CALL_CHANNEL_ID,
+            channelId,
             "CALL_CHANNEL_NAME",
-            NotificationManager.IMPORTANCE_HIGH
+            important
         )
         notificationManager.createNotificationChannel(channel)
         return notificationManager
@@ -45,6 +46,7 @@ object CallNotificationManager {
     fun incomingCallNotificationBuilder(
         @ApplicationContext context: Context,
         intent: Intent,
+        channelId: String,
         callerName: String,
         callerAvatar: String
     ): NotificationCompat.Builder {
@@ -54,17 +56,18 @@ object CallNotificationManager {
             .setImportant(true)
             .build()
 
-        return NotificationCompat.Builder(context, CiCareCallService.CALL_CHANNEL_ID)
-            .setContentIntent(screenCallIntent(context, intent))
+        return NotificationCompat.Builder(context, channelId)
+            .setFullScreenIntent(screenCallIntent(context, intent, "SCREEN"), true)
             .setSmallIcon(CiCareCallService.INCOMING_CALL_ICON)
             .setSound(CiCareCallService.ringtoneUrl, AudioManager.STREAM_RING)
             .addPerson(callerProfile)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setOngoing(true)
+            .setAutoCancel(false)
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(
                 callerProfile,
-                serviceCallIntent(context, intent, 1, CallAction.REJECT),
-                serviceCallIntent(context, intent, 2, CallAction.ACCEPT)
+                serviceCallIntent(context, intent, 1, CiCareCallService.ACTION.REJECT),
+                screenCallIntent(context, intent, CiCareCallService.ACTION.ACCEPT)
             ))
     }
 
@@ -73,6 +76,8 @@ object CallNotificationManager {
     fun outgoingCallNotificationBuilder(
         @ApplicationContext context: Context,
         intent: Intent,
+        channelId: String,
+        text: String,
         calleeName: String,
         calleeAvatar: String
     ): NotificationCompat.Builder {
@@ -82,16 +87,18 @@ object CallNotificationManager {
             .setImportant(true)
             .build()
 
-        return NotificationCompat.Builder(context, CiCareCallService.CALL_CHANNEL_ID)
-            .setContentIntent(screenCallIntent(context, intent))
+        return NotificationCompat.Builder(context, channelId)
+            .setFullScreenIntent(screenCallIntent(context, intent, "SCREEN"), true)
             .setSmallIcon(CiCareCallService.OUTGOING_CALL_ICON)
-            .setSound(CiCareCallService.ringtoneUrl, AudioManager.STREAM_VOICE_CALL)
+            //.setSound(CiCareCallService.ringtoneUrl, AudioManager.STREAM_VOICE_CALL)
             .addPerson(callerProfile)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentText("Calling $calleeName...")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentText(text)
+            .setOngoing(true)
+            .setAutoCancel(false)
             .setStyle(NotificationCompat.CallStyle.forOngoingCall(
                 callerProfile,
-                serviceCallIntent(context, intent, 1, CallAction.HANGUP)
+                serviceCallIntent(context, intent, 1, CiCareCallService.ACTION.HANGUP)
             ))
     }
 
@@ -100,6 +107,7 @@ object CallNotificationManager {
     fun ongoingCallNotificationBuilder(
         @ApplicationContext context: Context,
         intent: Intent,
+        channelId: String,
         calleeName: String,
         calleeAvatar: String
     ): NotificationCompat.Builder {
@@ -109,18 +117,19 @@ object CallNotificationManager {
             .setImportant(true)
             .build()
 
-        return NotificationCompat.Builder(context, CiCareCallService.CALL_CHANNEL_ID)
-            .setContentIntent(screenCallIntent(context, intent))
+        return NotificationCompat.Builder(context, channelId)
+            .setFullScreenIntent(screenCallIntent(context, intent, "SCREEN"), true)
             .setSmallIcon(CiCareCallService.ONGOING_CALL_ICON)
-            .setSound(CiCareCallService.ringtoneUrl, AudioManager.STREAM_VOICE_CALL)
+            //.setSound(CiCareCallService.ringtoneUrl, AudioManager.STREAM_VOICE_CALL)
             .addPerson(callerProfile)
             .setWhen(System.currentTimeMillis())
             .setUsesChronometer(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
+            .setAutoCancel(false)
             .setStyle(NotificationCompat.CallStyle.forOngoingCall(
                 callerProfile,
-                serviceCallIntent(context, intent, 1, CallAction.HANGUP)
+                serviceCallIntent(context, intent, 1, CiCareCallService.ACTION.HANGUP)
             ))
     }
 
@@ -129,6 +138,7 @@ object CallNotificationManager {
     fun missedCallNotificationBuilder(
         @ApplicationContext context: Context,
         intent: Intent,
+        channelId: String,
         calleeName: String,
         calleeAvatar: String
     ): NotificationCompat.Builder {
@@ -138,7 +148,7 @@ object CallNotificationManager {
             .setImportant(true)
             .build()
 
-        return NotificationCompat.Builder(context, CiCareCallService.CALL_CHANNEL_ID)
+        return NotificationCompat.Builder(context, channelId)
             .setSmallIcon(CiCareCallService.MISSED_CALL_ICON)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .addPerson(callerProfile)
@@ -148,10 +158,10 @@ object CallNotificationManager {
         @ApplicationContext context: Context,
         intent: Intent,
         code: Int,
-        callAction: CallAction
+        callAction: String
     ): PendingIntent {
         val hangupIntent = Intent(context, CiCareCallService::class.java).apply {
-            action = callAction.action
+            action = callAction
             putExtras(intent)
         }
 
@@ -164,15 +174,17 @@ object CallNotificationManager {
     private fun screenCallIntent(
         @ApplicationContext context: Context,
         intent: Intent,
+        callAction: String
     ): PendingIntent {
-        Log.i("INTEN", "SCREEN")
-        val hangupIntent = Intent(context, ScreenCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        Log.i("CALLSCREEN", "SCREEN")
+        val screenIntent = Intent(context, ScreenCallActivity::class.java).apply {
+            action = callAction
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtras(intent)
         }
 
-        return PendingIntent.getService(
-            context, 0, hangupIntent,
+        return PendingIntent.getActivity(
+            context, 0, screenIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
     }

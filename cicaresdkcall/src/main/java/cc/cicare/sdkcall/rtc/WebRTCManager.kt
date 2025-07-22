@@ -254,9 +254,12 @@ class WebRTCManager(
 
     fun close() {
         try {
-            peerConnection.dispose()
-            peerConnectionFactory.dispose()
-            eglBase.release()
+            if(::peerConnection.isInitialized) {
+                peerConnection.dispose()
+                peerConnectionFactory.dispose()
+            }
+            if (::eglBase.isInitialized)
+                eglBase.release()
         } catch (e: Exception) {
             e.printStackTrace()
         }

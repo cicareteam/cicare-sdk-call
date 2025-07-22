@@ -1,4 +1,4 @@
-package cc.cicare.sdkcall.signaling
+package cc.cicare.sdkcall.libs
 
 
 import com.google.gson.annotations.SerializedName

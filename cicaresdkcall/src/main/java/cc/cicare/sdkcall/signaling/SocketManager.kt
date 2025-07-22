@@ -46,7 +46,12 @@ class SocketManager(
 
         // Event when the callee accepts the call
         socket?.on("ACCEPTED") { args ->
-            callEventListener?.onCallStateChanged(CallState.ANSWERED)
+            callEventListener?.onCallStateChanged(CallState.CONNECTED)
+        }
+
+        // Event when the callee accepts the call
+        socket?.on("CONNECTED") { args ->
+            callEventListener?.onCallStateChanged(CallState.CONNECTED)
         }
 
         // Event when the call is ended from either side

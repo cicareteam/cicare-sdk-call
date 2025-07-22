@@ -4,11 +4,12 @@ plugins {
     id("kotlin-kapt")
     id("com.google.dagger.hilt.android") version "2.57" apply false
     alias(libs.plugins.kotlin.compose)
+    `maven-publish`
 }
 
 android {
     namespace = "cc.cicare.sdkcall"
-    compileSdk = 36
+    compileSdk = 33
 
     defaultConfig {
         minSdk = 29
@@ -70,4 +71,18 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
+
+                groupId = "com.github.cicareteam"
+                artifactId = "cicare-sdk-call"
+                version = "1.2.0-alpha"
+            }
+        }
+    }
 }

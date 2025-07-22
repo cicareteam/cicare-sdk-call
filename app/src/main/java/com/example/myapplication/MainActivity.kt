@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,14 +18,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import cc.cicare.sdkcall.CiCareSdkCall
 import cc.cicare.sdkcall.services.CiCareCallService
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            CiCareSdkCall.initActivity(this, this).checkAndRequestPermissions()
+        }
+        val context = this
         enableEdgeToEdge()
+        var metaData: Map<String, String> = hashMapOf(
+            "initializing" to "Mulai...",
+            "calling" to "Memanggil...",
+            "incoming" to "Panggilan Masuk",
+            "ringing" to "Berdering...",
+            "connected" to "Terhubung",
+            "ended" to "Tutup",
+            "answer" to "Jawab",
+            "decline" to "Tolak",
+            "mute" to "Bisu",
+            "unmute" to "Tidak Bisu",
+            "speaker" to "Nyaring",
+        )
         setContent {
             MyApplicationTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -33,15 +54,33 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding)
                             .padding(24.dp),
                         onStartOutbound = {
+                            lifecycleScope.launch {
+                                CiCareSdkCall.init(context).makeCall(
+                                    "1",
+                                    "Annas",
+                                    "",
+                                    "2",
+                                    "Halis",
+                                    "",
+                                    "",
+                                    metaData
+                                )
+                            }
+                        },
+                        onStartInbound = {
                             CiCareSdkCall.init(this).showIncoming(
+                                "1",
                                 "Annas",
                                 "",
+                                "",
+                                "",
+                                "",
+                                "",
+                                metaData,
                                 "djksfgakjsdghfjkadsfgajkdsfgjasd",
                                 "http://sip-gq.c-icare.cc:8443/",
                                 false
                             )
-                        },
-                        onStartInbound = {
                         }
                     )
                 }
