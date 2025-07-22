@@ -116,11 +116,6 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
     }
 
     override fun onCreate() {
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-            .setOnAudioFocusChangeListener { /* optional */ }
-            .build()
-        audioManager.requestAudioFocus(focusRequest)
         webRTCManager = WebRTCManager(this, this)
         socketManager = SocketManager(this, webRTCManager)
     }

@@ -53,7 +53,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-messaging:24.1.2")
-    implementation("com.github.cicareteam:cicare-sdk-call:1.2.0-alpha-1")
+    implementation("com.github.cicareteam:cicare-sdk-call:v1.2.0-alpha.1")
     //implementation(project(":cicaresdkcall"))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

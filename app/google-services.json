@@ -26,6 +26,25 @@
     },
     {
       "client_info": {
+        "mobilesdk_app_id": "1:835891495722:android:58c06dd14adb4772381453",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0rFY5HK5ar7cQSani1oqWkhDPsaK59mE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:835891495722:android:f22f99a319f15e9e381453",
         "android_client_info": {
           "package_name": "com.tsabitlab.trynotif"

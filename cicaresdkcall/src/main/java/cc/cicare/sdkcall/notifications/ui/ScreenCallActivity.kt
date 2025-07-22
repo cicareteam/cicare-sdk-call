@@ -9,6 +9,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -48,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import cc.cicare.sdkcall.event.CallEventListener
 import cc.cicare.sdkcall.event.CallState
@@ -139,8 +143,32 @@ class ScreenCallActivity : ComponentActivity(), CallEventListener, TimeTickerLis
         // handle update state or extras here
     }
 
+    @SuppressLint("ServiceCast")
+    private fun requestAudioFocus() {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setOnAudioFocusChangeListener { /* optional */ }
+            .build()
+        audioManager.requestAudioFocus(focusRequest)
+    }
+
+    private fun hasAllRequiredPermissions(context: Context): Boolean {
+        val micPermission = ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
+        val fgsMicPermission = if (Build.VERSION.SDK_INT >= 34) {
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
+        } else PackageManager.PERMISSION_GRANTED
+
+        return micPermission == PackageManager.PERMISSION_GRANTED &&
+                fgsMicPermission == PackageManager.PERMISSION_GRANTED
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (hasAllRequiredPermissions(this)) {
+            requestAudioFocus()
+        }
+
         val callerName = intent.getStringExtra("caller_name") ?: "Unknown"
         val callerAvatar = intent.getStringExtra("caller_avatar") ?: ""
         val calleeName = intent.getStringExtra("callee_name") ?: "unknown"
