@@ -250,6 +250,7 @@ class ScreenCallActivity : ComponentActivity(), CallEventListener, TimeTickerLis
         finish()
     }
 
+    @SuppressLint("DefaultLocale")
     private fun formatElapsedTime(seconds: Long): String {
         val minutes = seconds / 60
         val secs = seconds % 60
