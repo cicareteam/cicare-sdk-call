@@ -84,6 +84,7 @@ class CiCareSdkCall private constructor(private val context: Context, private va
             putExtra("is_from_phone", isFromPhone)
         }
         context.startForegroundService(intent)*/
+        context.startForegroundService(intent)
         if (hasAllRequiredPermissions(context)) {
             val notificationManager = CallNotificationManager.provideNotificationmanagerCompat(
                 context, "INCOMING_CALL_CHANNEL",
