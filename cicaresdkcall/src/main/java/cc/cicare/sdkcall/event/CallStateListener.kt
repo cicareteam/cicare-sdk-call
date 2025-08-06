@@ -48,7 +48,7 @@ enum class CallState {
  *
  * Implement this interface to receive updates about connection and call state.
  */
-interface CallEventListener {
+interface CallStateListener {
 
     /**
      * Called whenever the WebRTC peer connection state changes.

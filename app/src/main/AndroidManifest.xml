@@ -43,6 +43,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service android:name="cc.cicare.sdkcall.services.IncomingCallService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall|microphone"/>
         <service android:name="cc.cicare.sdkcall.services.CiCareCallService"
             android:foregroundServiceType="microphone|phoneCall"
             android:exported="false"/>

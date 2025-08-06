@@ -15,16 +15,9 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresPermission
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.text.capitalize
-import androidx.compose.ui.text.intl.Locale
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.lifecycleScope
-import cc.cicare.sdkcall.event.CallEventListener
+import cc.cicare.sdkcall.event.CallStateListener
 import cc.cicare.sdkcall.event.CallState
 import cc.cicare.sdkcall.libs.ApiClient
 import cc.cicare.sdkcall.libs.CallRequest
@@ -32,6 +25,7 @@ import cc.cicare.sdkcall.notifications.CallNotificationManager
 import cc.cicare.sdkcall.notifications.ui.ScreenCallActivity
 import cc.cicare.sdkcall.rtc.WebRTCEventCallback
 import cc.cicare.sdkcall.rtc.WebRTCManager
+import cc.cicare.sdkcall.signaling.SignalingHelper
 import cc.cicare.sdkcall.signaling.SocketManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +33,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -47,18 +40,16 @@ import org.webrtc.IceCandidate
 import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
 import org.webrtc.SessionDescription
-import javax.inject.Singleton
 
 interface TimeTickerListener {
     fun onTimeTicketUpdate(seconds: Long)
 }
 
-@Singleton
-class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
+class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
 
     private lateinit var webRTCManager: WebRTCManager
-    private lateinit var socketManager: SocketManager
-    private lateinit var eventListener: CallEventListener
+    private lateinit var signaling: SignalingHelper
+    private lateinit var eventListener: CallStateListener
     private lateinit var tickerListener: TimeTickerListener
 
     private var outgoingIntent: Intent? = null
@@ -66,9 +57,7 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
     private var isFromPhone = false
     private val serviceScope = CoroutineScope(Dispatchers.IO)
 
-    // timer job
     private var timerJob: Job? = null
-    private var startTime = 0L
 
     var callState = MutableStateFlow<String>("initializing")
 
@@ -117,7 +106,17 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
 
     override fun onCreate() {
         webRTCManager = WebRTCManager(this, this)
-        socketManager = SocketManager(this, webRTCManager)
+        signaling = SignalingHelper(webRTCManager)
+        SocketManager.setCallStateListener(this)
+    }
+
+    private fun requestAudioFocus() {
+        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setOnAudioFocusChangeListener { /* optional */ }
+            .build()
+        audioManager.requestAudioFocus(focusRequest)
+        Log.i("FCM", "Audio focus")
     }
 
     fun startCallTimer() {
@@ -149,7 +148,10 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
         }
 
         when(intent?.action) {
-            ACTION.INCOMING -> onIncomingCall(intent)
+            ACTION.INCOMING -> {
+                callState.value = "incoming"
+                Log.i("FCM", "Service incoming")
+            }
             ACTION.ONGOING -> onOngoingCall(intent)
             ACTION.ACCEPT -> serviceScope.launch { answerCall(intent) }
             ACTION.OUTGOING -> serviceScope.launch { onOutgoingCall(intent) }
@@ -168,7 +170,7 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
     }
 
     fun reject() {
-        socketManager.send("REJECT", JSONObject().apply {})
+        SocketManager.send("REJECT", JSONObject().apply {})
         if (::eventListener.isInitialized)
             eventListener.onCallStateChanged(CallState.ENDED)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -176,7 +178,7 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
     }
 
     fun hangup() {
-        socketManager.send("REQUEST_HANGUP", JSONObject().apply {})
+        SocketManager.send("REQUEST_HANGUP", JSONObject().apply {})
         if (::eventListener.isInitialized)
             eventListener.onCallStateChanged(CallState.ENDED)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -191,22 +193,12 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
         webRTCManager.setAudioOutputToSpeaker(isSpeakerOn)
     }
 
-    private fun initReceive(server: String, token: String, isFromPhone: Boolean?) {
-        socketManager.connect(server, token)
-        socketManager.send("RINGING_CALL", JSONObject().apply {})
-
-        this.isFromPhone = isFromPhone ?: false
-    }
-
     private suspend fun initCall(server: String, token: String) {
-
-        server ?: return
-        token ?: return
 
         webRTCManager.init()
         webRTCManager.initMic()
-        socketManager.connect(server, token)
-        socketManager.send("INIT_CALL", JSONObject().apply {
+        SocketManager.connect(server, token)
+        SocketManager.send("INIT_CALL", JSONObject().apply {
             put("is_caller", true)
             put("sdp", JSONObject().apply {
                 put("type", "offer")
@@ -234,19 +226,20 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
         }
         onCallStateChanged(CallState.CONNECTED)
         onOngoingCall(intent)
-        socketManager.send("ANSWER_CALL", JSONObject().apply {
+        SocketManager.send("ANSWER_CALL", JSONObject().apply {
             put("is_caller", false)
             put("sdp", JSONObject().apply {
                 put("type", sdp.type.toString())
                 put("sdp", sdp.description)
             })
         })
+        Log.i("FCM", "ANSWER SIGNAL SENT")
     }
 
     @SuppressLint("MissingPermission")
     private suspend fun onOutgoingCall(intent: Intent) {
         outgoingIntent = intent
-        val callType = intent.getStringExtra("call_type") ?: "outgoing"
+        //val callType = intent.getStringExtra("call_type") ?: "outgoing"
         val calleeId = intent.getStringExtra("callee_id") ?: ""
         val callerId = intent.getStringExtra("caller_id") ?: ""
         val calleeName = intent.getStringExtra("callee_name") ?: "unknown"
@@ -315,40 +308,8 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
         notificationManager.notify(101, notification.build())
     }
 
-    private fun onIncomingCall(intent: Intent) {
-        val callerName = intent.getStringExtra("caller_name") ?: "unknown"
-        val callerAvatar = intent.getStringExtra("caller_avatar") ?: ""
-        val token = intent.getStringExtra("token") ?: return
-        val server = intent.getStringExtra("server") ?: return
-        isFromPhone = intent.getBooleanExtra("from_phone", false)
-        CallNotificationManager.provideNotificationmanagerCompat(
-            this, "CALL_INCOMING_CHANNEL_ID", NotificationManager.IMPORTANCE_MAX)
-        val notification = CallNotificationManager.incomingCallNotificationBuilder(
-            this,
-            intent,
-            "CALL_INCOMING_CHANNEL_ID",
-            callerName,
-            callerAvatar
-        )
-        callState.value = "incoming"
-//        if (isFromPhone) {
-//            webRTCManager.init()
-//            webRTCManager.initMic()
-//        }
-
-        initReceive(server, token, isFromPhone)
-
-        startForeground(101, notification.build())
-//        val isForeground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
-//        if (isForeground) {
-//            startActivity(Intent(this, ScreenCallActivity::class.java).apply {
-//                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-//                putExtras(intent)
-//            })
-//        }
-    }
-
     private fun onOngoingCall(intent: Intent) {
+        requestAudioFocus()
         val callType = intent.getStringExtra("call_type") ?: "outgoing"
         val callerName =
             if (callType == "incoming") intent.getStringExtra("caller_name") else intent.getStringExtra("callee_name")
@@ -366,7 +327,7 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
         startForeground(101, notification.build())
     }
 
-    fun setCallEventListener(eventListener: CallEventListener) {
+    fun setCallEventListener(eventListener: CallStateListener) {
         this.eventListener = eventListener
     }
 
@@ -378,8 +339,7 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
         stopForeground(STOP_FOREGROUND_REMOVE)
         if (::webRTCManager.isInitialized)
             webRTCManager.close()
-        if (::socketManager.isInitialized)
-            socketManager.disconnect()
+        SocketManager.disconnect()
         super.onDestroy()
     }
 
@@ -389,7 +349,7 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
      * @param sdp The session description created.
      */
     override fun onLocalSdpCreated(sdp: SessionDescription) {
-        socketManager.send("SDP_OFFER", JSONObject().apply {
+        SocketManager.send("SDP_OFFER", JSONObject().apply {
             put("type", sdp.type)
             put("sdp", sdp.description)
         })
@@ -401,7 +361,7 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
      * @param candidate The ICE candidate to be sent to remote peer.
      */
     override fun onIceCandidateGenerated(candidate: IceCandidate) {
-        socketManager.send("ICE_CANDIDATE", JSONObject().apply {
+        SocketManager.send("ICE_CANDIDATE", JSONObject().apply {
             put("sdpMid", candidate.sdpMid)
             put("sdpMLineIndex", candidate.sdpMLineIndex)
             put("candidate", candidate.sdp)
@@ -431,18 +391,18 @@ class CiCareCallService: Service(), CallEventListener, WebRTCEventCallback {
     }
 
     @SuppressLint("MissingPermission")
-    override fun onCallStateChanged(state: CallState) {
+    override fun onCallStateChanged(callState: CallState) {
         if (::eventListener.isInitialized)
-            eventListener.onCallStateChanged(state)
+            eventListener.onCallStateChanged(callState)
 
-        callState.value = state.toString().lowercase()
-        if (state == CallState.CALLING || state == CallState.RINGING) {
-            outgoingCallStateUpdate(callState.value)
+        this@CiCareCallService.callState.value = callState.toString().lowercase()
+        if (callState == CallState.CALLING || callState == CallState.RINGING) {
+            outgoingCallStateUpdate(this@CiCareCallService.callState.value)
         }
-        if (state == CallState.CONNECTED) {
+        if (callState == CallState.CONNECTED) {
             startCallTimer()
         }
-        if (state == CallState.ENDED) {
+        if (callState == CallState.ENDED) {
             stopTimer()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()

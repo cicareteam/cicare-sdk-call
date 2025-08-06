@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import cc.cicare.sdkcall.notifications.ui.ScreenCallActivity
 import cc.cicare.sdkcall.services.CiCareCallService
+import cc.cicare.sdkcall.services.IncomingCallService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -56,6 +57,10 @@ object CallNotificationManager {
             .setImportant(true)
             .build()
 
+        val rejectService = Intent(context, IncomingCallService::class.java).apply{
+            action = CiCareCallService.ACTION.REJECT
+        }
+
         return NotificationCompat.Builder(context, channelId)
             .setFullScreenIntent(screenCallIntent(context, intent, "INCOMING"), true)
             .setSmallIcon(CiCareCallService.INCOMING_CALL_ICON)
@@ -66,7 +71,8 @@ object CallNotificationManager {
             .setAutoCancel(false)
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(
                 callerProfile,
-                serviceCallIntent(context, intent, 1, CiCareCallService.ACTION.REJECT),
+                PendingIntent.getService(
+                    context, 1,rejectService, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT),
                 screenCallIntent(context, intent, CiCareCallService.ACTION.ACCEPT)
             ))
     }

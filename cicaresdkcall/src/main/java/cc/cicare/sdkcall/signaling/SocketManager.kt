@@ -1,9 +1,9 @@
 package cc.cicare.sdkcall.signaling
 
 import android.util.Log
-import cc.cicare.sdkcall.event.CallEventListener
+import cc.cicare.sdkcall.event.CallStateListener
 import cc.cicare.sdkcall.event.CallState
-import cc.cicare.sdkcall.rtc.WebRTCManager
+import cc.cicare.sdkcall.signaling.SignalingHelper
 import io.socket.client.IO
 import io.socket.client.Socket
 import org.json.JSONObject
@@ -16,14 +16,19 @@ import org.webrtc.SessionDescription
  * connection using the Socket.IO client. It communicates SDP offers/answers and
  * call control events such as HANGUP, RINGING, etc.
  *
- * @property callEventListener A listener to receive call state updates.
- * @property webrtcManager Reference to WebRTC manager to handle SDP and media.
  */
-class SocketManager(
-    private val callEventListener: CallEventListener?,
-    private val webrtcManager: WebRTCManager
-) {
+object SocketManager {
     private var socket: Socket? = null
+    private var callStateListener: CallStateListener? = null
+    private var signalingHelper: SignalingHelper? = null
+
+    fun setCallStateListener(callStateListener: CallStateListener) {
+        this.callStateListener = callStateListener
+    }
+
+    fun setSignalingEventListener(signalingHelper: SignalingHelper) {
+        this.signalingHelper = signalingHelper
+    }
 
     /**
      * Connects to the signaling server via WebSocket using Socket.IO protocol.
@@ -44,18 +49,18 @@ class SocketManager(
 
         // Event when the callee accepts the call
         socket?.on("ACCEPTED") { _ ->
-            callEventListener?.onCallStateChanged(CallState.CONNECTED)
+            callStateListener?.onCallStateChanged(CallState.CONNECTED)
         }
 
         // Event when the callee accepts the call
         socket?.on("CONNECTED") { _ ->
-            callEventListener?.onCallStateChanged(CallState.CONNECTED)
+            callStateListener?.onCallStateChanged(CallState.CONNECTED)
         }
 
         // Event when the call is ended from either side
         socket?.on("HANGUP") { _ ->
-            callEventListener?.onCallStateChanged(CallState.ENDED)
-            webrtcManager.close()
+            callStateListener?.onCallStateChanged(CallState.ENDED)
+            signalingHelper?.close()
             socket?.disconnect()
         }
 
@@ -64,16 +69,19 @@ class SocketManager(
             //callEventListener.onCallStateChanged(CallState.CONNECTING)
             val json = args[0] as JSONObject
             val sdpString = json.getString("sdp")
-            webrtcManager.init()
-            webrtcManager.initMic()
+            if (signalingHelper == null) {
+                Log.e("SocketManager", "SignalingHelper is null! Cannot initRTC")
+            } else {
+                signalingHelper?.initRTC()
+            }
 
             val sdp = SessionDescription(SessionDescription.Type.OFFER, sdpString)
-            webrtcManager.setRemoteDescription(sdp)
+            signalingHelper?.setRemoteDescription(sdp)
         }
 
         // Ringing event sent to callee to indicate incoming call
         socket?.on("RINGING") { _ ->
-            callEventListener?.onCallStateChanged(CallState.RINGING)
+            callStateListener?.onCallStateChanged(CallState.RINGING)
         }
 
         // Received SDP answer from remote peer
@@ -81,9 +89,9 @@ class SocketManager(
             //callEventListener.onCallStateChanged(CallState.CONNECTING)
             val json = args[0] as JSONObject
             val sdpString = json.getString("sdp")
-            Log.i("SDP_OFFER", sdpString)
+            Log.i("SDP_ANSWER", sdpString)
             val sdp = SessionDescription(SessionDescription.Type.ANSWER, sdpString)
-            webrtcManager.setRemoteDescription(sdp)
+            signalingHelper?.setRemoteDescription(sdp)
         }
     }
 

@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.myapplication"
+    namespace = "com.example.sdkapp"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.example.sdkapp"
         minSdk = 29
         targetSdk = 36
         versionCode = 1
@@ -51,13 +51,16 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     testImplementation(libs.junit)
-    implementation("com.google.gms:google-services:4.4.3")
-
-    implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
-    implementation("com.google.firebase:firebase-analytics")
+    implementation(libs.google.services)
+    implementation(libs.okhttp)
+    implementation(libs.logging.interceptor)
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
     implementation("com.google.firebase:firebase-messaging:24.1.2")
-    implementation("com.github.cicareteam:cicare-sdk-call:v1.2.0-alpha.1")
-    //implementation(project(":cicaresdkcall"))
+    //implementation("com.github.cicareteam:cicare-sdk-call:v1.2.0-alpha.1")
+    implementation(project(":cicaresdkcall"))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
