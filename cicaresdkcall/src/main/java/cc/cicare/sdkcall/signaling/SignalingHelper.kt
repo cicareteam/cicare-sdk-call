@@ -1,5 +1,6 @@
 package cc.cicare.sdkcall.signaling
 
+import android.util.Log
 import cc.cicare.sdkcall.rtc.WebRTCManager
 import org.webrtc.SessionDescription
 
@@ -10,6 +11,7 @@ class SignalingHelper(
     fun initRTC() {
         webrtcManager.init()
         webrtcManager.initMic()
+        Log.i("FCM", "INIT RTC")
     }
 
     fun setRemoteDescription(sdp: SessionDescription) {

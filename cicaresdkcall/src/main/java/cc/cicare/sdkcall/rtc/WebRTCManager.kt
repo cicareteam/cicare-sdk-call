@@ -16,7 +16,7 @@ class WebRTCManager(
     private val callback: WebRTCEventCallback
 ) {
 
-    private lateinit var peerConnection: PeerConnection
+    private var peerConnection: PeerConnection? = null
     private lateinit var eglBase: EglBase
     private lateinit var peerConnectionFactory: PeerConnectionFactory
     private lateinit var audioTrack: AudioTrack
@@ -73,10 +73,17 @@ class WebRTCManager(
     }
 
     fun initMic() {
-        val audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
+        val audioConstraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+        }
+        val audioSource = peerConnectionFactory.createAudioSource(audioConstraints)
         audioTrack = peerConnectionFactory.createAudioTrack("101", audioSource)
         audioTrack.setEnabled(true)
-        peerConnection.addTrack(audioTrack)
+        peerConnection?.addTrack(audioTrack)
+
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -86,10 +93,10 @@ class WebRTCManager(
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
         }
 
-        peerConnection.createOffer(object : SdpObserverAdapter() {
+        peerConnection?.createOffer(object : SdpObserverAdapter() {
             override fun onCreateSuccess(sdp: SessionDescription?) {
                 if (sdp != null) {
-                    peerConnection.setLocalDescription(object : SdpObserverAdapter() {
+                    peerConnection?.setLocalDescription(object : SdpObserverAdapter() {
                         override fun onSetSuccess() {
                             cont.resume(sdp) {} // resume coroutine with sdp
                         }
@@ -129,7 +136,7 @@ class WebRTCManager(
 
     fun setLocalDescription(sdp: SessionDescription?) {
         sdp?.let {
-            peerConnection.setLocalDescription(object : SdpObserverAdapter() {
+            peerConnection?.setLocalDescription(object : SdpObserverAdapter() {
                 override fun onSetSuccess() {
                     Log.d("WebRTC", "Remote SDP set successfully")
                 }
@@ -143,7 +150,7 @@ class WebRTCManager(
 
     fun setRemoteDescription(sdp: SessionDescription?) {
         sdp?.let {
-            peerConnection.setRemoteDescription(object : SdpObserverAdapter() {
+            peerConnection?.setRemoteDescription(object : SdpObserverAdapter() {
                 override fun onSetSuccess() {
                     Log.d("WebRTC", "Remote SDP set successfully")
                 }
@@ -162,10 +169,10 @@ class WebRTCManager(
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
         }
 
-        peerConnection.createAnswer(object : SdpObserverAdapter() {
+        peerConnection?.createAnswer(object : SdpObserverAdapter() {
             override fun onCreateSuccess(sdp: SessionDescription?) {
                 if (sdp != null) {
-                    peerConnection.setLocalDescription(object : SdpObserverAdapter() {
+                    peerConnection?.setLocalDescription(object : SdpObserverAdapter() {
                         override fun onSetSuccess() {
                             cont.resume(sdp) {} // resume coroutine with sdp
                         }
@@ -244,8 +251,8 @@ class WebRTCManager(
     }
 
     fun isPeerConnectionActive(): Boolean {
-        return ::peerConnection.isInitialized &&
-                peerConnection.connectionState() != PeerConnection.PeerConnectionState.CLOSED
+        return peerConnection != null &&
+                peerConnection?.connectionState() != PeerConnection.PeerConnectionState.CLOSED
     }
 
     fun setMicEnabled(enabled: Boolean) {
@@ -254,14 +261,16 @@ class WebRTCManager(
 
     fun close() {
         try {
-            if(::peerConnection.isInitialized) {
-                peerConnection.dispose()
+            if(peerConnection != null) {
+                peerConnection?.dispose()
                 peerConnectionFactory.dispose()
             }
             if (::eglBase.isInitialized)
                 eglBase.release()
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            peerConnection = null
         }
     }
 }

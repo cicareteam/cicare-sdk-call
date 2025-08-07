@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             CiCareSdkCall.initActivity(this, this).checkAndRequestPermissions()
         }
         val context = this
@@ -68,21 +68,21 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         },
-                        onStartInbound = {
-                            CiCareSdkCall.init(this).showIncoming(
-                                "1",
-                                "Annas",
-                                "",
-                                "",
-                                "",
-                                "",
-                                "",
-                                metaData,
-                                "djksfgakjsdghfjkadsfgajkdsfgjasd",
-                                "http://sip-gq.c-icare.cc:8443/",
-                                false
-                            )
-                        }
+//                        onStartInbound = {
+//                            CiCareSdkCall.init(this).showIncoming(
+//                                "1",
+//                                "Annas",
+//                                "",
+//                                "",
+//                                "",
+//                                "",
+//                                "",
+//                                metaData,
+//                                "djksfgakjsdghfjkadsfgajkdsfgjasd",
+//                                "http://sip-gq.c-icare.cc:8443/",
+//                                false
+//                            )
+//                        }
                     )
                 }
             }
@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
 fun TestServiceButtons(
     modifier: Modifier = Modifier,
     onStartOutbound: () -> Unit,
-    onStartInbound: () -> Unit
+    //onStartInbound: () -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -103,9 +103,9 @@ fun TestServiceButtons(
         Button(onClick = onStartOutbound, modifier = Modifier.fillMaxWidth()) {
             Text("Start Outbound Call Service")
         }
-
-        Button(onClick = onStartInbound, modifier = Modifier.fillMaxWidth()) {
-            Text("Start Inbound Call Service")
-        }
+//
+//        Button(onClick = onStartInbound, modifier = Modifier.fillMaxWidth()) {
+//            Text("Start Inbound Call Service")
+//        }
     }
 }

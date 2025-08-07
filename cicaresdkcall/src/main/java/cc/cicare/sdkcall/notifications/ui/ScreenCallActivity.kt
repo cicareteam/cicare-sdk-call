@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
@@ -20,6 +21,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Message
@@ -44,6 +47,7 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -59,10 +63,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import cc.cicare.sdkcall.event.CallStateListener
 import cc.cicare.sdkcall.event.CallState
+import cc.cicare.sdkcall.event.MessageActionListener
+import cc.cicare.sdkcall.event.MessageListenerHolder
 import cc.cicare.sdkcall.notifications.ui.model.CallViewModel
 import cc.cicare.sdkcall.services.CiCareCallService
 import cc.cicare.sdkcall.services.IncomingCallService
@@ -89,6 +96,9 @@ class ScreenCallActivity : ComponentActivity(), CallStateListener, TimeTickerLis
     //private var callStatusRaw by mutableStateOf("initializing")
     private var isMicMuted by mutableStateOf(false)
     private var isSpeakerOn by mutableStateOf(false)
+
+    private val listener: MessageActionListener?
+        get() = MessageListenerHolder.listener
 
     private var metaData: HashMap<*, *> = hashMapOf(
         "call_title" to "Free Call",
@@ -227,26 +237,34 @@ class ScreenCallActivity : ComponentActivity(), CallStateListener, TimeTickerLis
         // handle update state or extras here
     }
 
-    private fun hasAllRequiredPermissions(context: Context): Boolean {
-        val micPermission = ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
-        val fgsMicPermission = if (Build.VERSION.SDK_INT >= 34) {
-            ContextCompat.checkSelfPermission(context, android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
-        } else PackageManager.PERMISSION_GRANTED
+    private fun requestAudioFocus() {
+        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        /*val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setOnAudioFocusChangeListener { /* optional */ }
+            .build()*/
+        //audioManager.requestAudioFocus(focusRequest)
+        Log.i("FCM", "Audio focus")
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
 
-        return micPermission == PackageManager.PERMISSION_GRANTED &&
-                fgsMicPermission == PackageManager.PERMISSION_GRANTED
+        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(audioAttributes)
+            .setAcceptsDelayedFocusGain(false)
+            .setOnAudioFocusChangeListener { /* handle focus change */ }
+            .build()
+
+        audioManager.requestAudioFocus(focusRequest)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (!hasAllRequiredPermissions(this)) {
-            hangup()
-        }
-
         val context = this
 
-        Log.i("FCM", intent?.action.toString())
+        requestAudioFocus()
+
         when(intent?.action) {
             CiCareCallService.ACTION.ACCEPT -> lifecycleScope.launch {
                 val _intent = Intent(context, CiCareCallService::class.java).apply {
@@ -302,6 +320,10 @@ class ScreenCallActivity : ComponentActivity(), CallStateListener, TimeTickerLis
                     isSpeakerOn = !isSpeakerOn
                     callService?.setSpeaker(isSpeakerOn)
                 },
+                onMessageClick = {
+                    listener?.onShowMessagePage()
+                    hangup()
+                },
                 onAnswerCallClick = {
                     lifecycleScope.launch {
                         answer()
@@ -320,10 +342,10 @@ class ScreenCallActivity : ComponentActivity(), CallStateListener, TimeTickerLis
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        //callDurationJob?.cancel()
+        MessageListenerHolder.listener = null
         callService?.stopSelf()
         incomingService?.stopSelf()
+        super.onDestroy()
     }
 
 
@@ -404,6 +426,7 @@ fun CallScreen(
     metaData: Map<String, String>,
     onMuteClick: () -> Unit,
     onSpeakerClick: () -> Unit,
+    onMessageClick: () -> Unit,
     onAnswerCallClick: () -> Unit,
     onEndCallClick: () -> Unit
 ) {
@@ -483,7 +506,7 @@ fun CallScreen(
                     RoundIconButton(
                         icon = Icons.AutoMirrored.Outlined.Chat,
                         label = metaData["call_btn_message"] ?: "Message",
-                        onClick = onSpeakerClick,
+                        onClick = onMessageClick,
                         backgroundColor = Color(0xFFE9F8F9),
                         iconTint = Color(0xFF17666A),
                     )
@@ -502,6 +525,16 @@ fun CallScreen(
                     iconTint = Color.White,
                     enabled = callStatusRaw.lowercase() != "ended"
                 )
+                if (callStatusRaw.lowercase() == "incoming") {
+                    Spacer(modifier = Modifier.width(160.dp))
+                    RoundIconButton(
+                        icon = Icons.Default.Phone,
+                        label = "",
+                        onClick = onAnswerCallClick,
+                        backgroundColor = Color.Green,
+                        iconTint = Color.White,
+                    )
+                }
             }
             //}
         }
@@ -650,7 +683,7 @@ fun DefaultPreview() {
     CallScreen(
         "Driver Andhi",
         "",
-        "ended",
+        "connect",
         "",
         false,
         false,
@@ -658,6 +691,7 @@ fun DefaultPreview() {
         onMuteClick = {},
         onEndCallClick = {},
         onAnswerCallClick = {},
-        onSpeakerClick = {}
+        onSpeakerClick = {},
+        onMessageClick= {}
     )
 }

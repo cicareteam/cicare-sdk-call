@@ -1,7 +1,9 @@
 package com.example.sdkapp
 
 import android.util.Log
+import android.widget.Toast
 import cc.cicare.sdkcall.CiCareSdkCall
+//import cc.cicare.sdkcall.event.MessageActionListener
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +62,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             server = server,
             isFromPhone = fromPhone.toBoolean(),
             checkSum = "",
+//            messageActionListener = {
+//                Toast.makeText(this, "Hello Message", Toast.LENGTH_LONG).show()
+//            }
             )
     }
 }

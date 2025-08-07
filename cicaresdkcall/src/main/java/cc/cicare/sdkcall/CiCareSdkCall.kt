@@ -11,23 +11,35 @@ import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import cc.cicare.sdkcall.event.MessageActionListener
+import cc.cicare.sdkcall.event.MessageListenerHolder
 import cc.cicare.sdkcall.notifications.CallNotificationManager
 import cc.cicare.sdkcall.notifications.ui.ScreenCallActivity
 import cc.cicare.sdkcall.services.CiCareCallService
 import cc.cicare.sdkcall.services.IncomingCallService
 
-class CiCareSdkCall private constructor(private val context: Context, private val activity: Activity?) {
+class CiCareSdkCall private constructor(private val context: Context) {
 
     companion object {
         fun init(context: Context): CiCareSdkCall {
-            return CiCareSdkCall(context.applicationContext, null)
-        }
-        fun initActivity(context: Context, activity: Activity?): CiCareSdkCall {
-            return CiCareSdkCall(context.applicationContext, activity)
+            return CiCareSdkCall(context.applicationContext)
         }
     }
 
     private val requiredPermissions = arrayOf(
+        android.Manifest.permission.RECORD_AUDIO,
+        android.Manifest.permission.FOREGROUND_SERVICE,
+    )
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private val requiredPermissionsTirmaisu = arrayOf(
+        android.Manifest.permission.RECORD_AUDIO,
+        android.Manifest.permission.FOREGROUND_SERVICE,
+        android.Manifest.permission.POST_NOTIFICATIONS,
+    )
+
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    private val requiredPermissionsUpsideDownCake = arrayOf(
         android.Manifest.permission.RECORD_AUDIO,
         android.Manifest.permission.FOREGROUND_SERVICE,
         android.Manifest.permission.POST_NOTIFICATIONS,
@@ -35,20 +47,16 @@ class CiCareSdkCall private constructor(private val context: Context, private va
         android.Manifest.permission.FOREGROUND_SERVICE_PHONE_CALL
     )
 
-    @RequiresApi(Build.VERSION_CODES.S)
-    fun checkAndRequestPermissions() {
-        if (requiredPermissions.any {
+    fun checkAndRequestPermissions(activity: Activity) {
+        val permissions = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
+            requiredPermissions else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+            requiredPermissionsTirmaisu
+        else
+            requiredPermissionsUpsideDownCake
+        if (permissions.any {
                 ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
             }) {
-            if (activity != null) {
-                ActivityCompat.requestPermissions(activity, requiredPermissions, 1001)
-            }
-        }
-    }
-
-    private fun hasAllRequiredPermissions(context: Context): Boolean {
-        return requiredPermissions.any {
-            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+                ActivityCompat.requestPermissions(activity, permissions, 1001)
         }
     }
 
@@ -60,19 +68,14 @@ class CiCareSdkCall private constructor(private val context: Context, private va
                      calleeAvatar: String,
                      checkSum: String,
                      metaData: Map<String, String> = emptyMap(),
-                     tokenCall: String, server: String, isFromPhone: Boolean) {
+                     tokenCall: String,
+                     server: String,
+                     isFromPhone: Boolean,
+                     messageActionListener: MessageActionListener
+                     ) {
+        MessageListenerHolder.listener = messageActionListener
+
         val meta: HashMap<String, String> = HashMap(metaData)
-//        val intent = Intent(context, ScreenCallActivity::class.java).apply {
-//            action = "INCOMING"
-//            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-//            putExtra("call_type", "incoming")
-//            putExtra("caller_name", callerName)
-//            putExtra("caller_avatar", callerAvatar)
-//            putExtra("meta_data", meta)
-//            putExtra("token", tokenCall)
-//            putExtra("server", server)
-//            putExtra("is_from_phone", isFromPhone)
-//        }
         val intent = Intent(context, IncomingCallService::class.java).apply {
             action = CiCareCallService.ACTION.INCOMING
             putExtra("call_type", "incoming")
@@ -84,21 +87,6 @@ class CiCareSdkCall private constructor(private val context: Context, private va
             putExtra("is_from_phone", isFromPhone)
         }
         context.startForegroundService(intent)
-//        context.startForegroundService(intent)
-//        if (hasAllRequiredPermissions(context)) {
-//            val notificationManager = CallNotificationManager.provideNotificationmanagerCompat(
-//                context, "INCOMING_CALL_CHANNEL",
-//                NotificationManagerCompat.IMPORTANCE_MAX
-//            )
-//            val notify = CallNotificationManager.incomingCallNotificationBuilder(
-//                context,
-//                intent,
-//                "INCOMING_CALL_CHANNEL",
-//                callerName,
-//                callerAvatar
-//            )
-//            notificationManager.notify(101, notify.build())
-//        }
     }
 
     fun makeCall(callerId: String,

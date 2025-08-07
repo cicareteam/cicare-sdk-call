@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.RingtoneManager
@@ -40,6 +41,7 @@ import org.webrtc.IceCandidate
 import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
 import org.webrtc.SessionDescription
+import kotlin.math.sign
 
 interface TimeTickerListener {
     fun onTimeTicketUpdate(seconds: Long)
@@ -48,9 +50,10 @@ interface TimeTickerListener {
 class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
 
     private lateinit var webRTCManager: WebRTCManager
-    private lateinit var signaling: SignalingHelper
+    private lateinit var socketManager: SocketManager
     private lateinit var eventListener: CallStateListener
     private lateinit var tickerListener: TimeTickerListener
+
 
     private var outgoingIntent: Intent? = null
 
@@ -105,18 +108,34 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
     }
 
     override fun onCreate() {
+        requestAudioFocus()
         webRTCManager = WebRTCManager(this, this)
-        signaling = SignalingHelper(webRTCManager)
-        SocketManager.setCallStateListener(this)
+        webRTCManager.init()
+        webRTCManager.initMic()
+        socketManager = SocketManager()
+        socketManager.setCallStateListener(this)
+        socketManager.setWebrtc(webRTCManager)
     }
 
     private fun requestAudioFocus() {
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        /*val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
             .setOnAudioFocusChangeListener { /* optional */ }
-            .build()
-        audioManager.requestAudioFocus(focusRequest)
+            .build()*/
+        //audioManager.requestAudioFocus(focusRequest)
         Log.i("FCM", "Audio focus")
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+
+        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(audioAttributes)
+            .setAcceptsDelayedFocusGain(false)
+            .setOnAudioFocusChangeListener { /* handle focus change */ }
+            .build()
+
+        audioManager.requestAudioFocus(focusRequest)
     }
 
     fun startCallTimer() {
@@ -170,7 +189,7 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
     }
 
     fun reject() {
-        SocketManager.send("REJECT", JSONObject().apply {})
+        socketManager.send("REJECT", JSONObject().apply {})
         if (::eventListener.isInitialized)
             eventListener.onCallStateChanged(CallState.ENDED)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -178,7 +197,7 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
     }
 
     fun hangup() {
-        SocketManager.send("REQUEST_HANGUP", JSONObject().apply {})
+        socketManager.send("REQUEST_HANGUP", JSONObject().apply {})
         if (::eventListener.isInitialized)
             eventListener.onCallStateChanged(CallState.ENDED)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -197,8 +216,8 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
 
         webRTCManager.init()
         webRTCManager.initMic()
-        SocketManager.connect(server, token)
-        SocketManager.send("INIT_CALL", JSONObject().apply {
+        socketManager.connect(server, token)
+        socketManager.send("INIT_CALL", JSONObject().apply {
             put("is_caller", true)
             put("sdp", JSONObject().apply {
                 put("type", "offer")
@@ -216,17 +235,19 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
                 putExtras(intent)
             })
         }
+        val server = intent.getStringExtra("server") ?: ""
+        val token = intent.getStringExtra("token") ?: ""
+        socketManager.connect(server, token)
         val sdp: SessionDescription?
         if (this.isFromPhone)
             sdp = webRTCManager.createAnswer()
         else {
-            webRTCManager.init()
             webRTCManager.initMic()
             sdp = webRTCManager.createOffer()
         }
         onCallStateChanged(CallState.CONNECTED)
         onOngoingCall(intent)
-        SocketManager.send("ANSWER_CALL", JSONObject().apply {
+        socketManager.send("ANSWER_CALL", JSONObject().apply {
             put("is_caller", false)
             put("sdp", JSONObject().apply {
                 put("type", sdp.type.toString())
@@ -309,7 +330,6 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
     }
 
     private fun onOngoingCall(intent: Intent) {
-        requestAudioFocus()
         val callType = intent.getStringExtra("call_type") ?: "outgoing"
         val callerName =
             if (callType == "incoming") intent.getStringExtra("caller_name") else intent.getStringExtra("callee_name")
@@ -337,9 +357,9 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
 
     override fun onDestroy() {
         stopForeground(STOP_FOREGROUND_REMOVE)
-        if (::webRTCManager.isInitialized)
-            webRTCManager.close()
-        SocketManager.disconnect()
+        //signaling.close()
+        webRTCManager.close()
+        socketManager.disconnect()
         super.onDestroy()
     }
 
@@ -349,7 +369,7 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
      * @param sdp The session description created.
      */
     override fun onLocalSdpCreated(sdp: SessionDescription) {
-        SocketManager.send("SDP_OFFER", JSONObject().apply {
+        socketManager.send("SDP_OFFER", JSONObject().apply {
             put("type", sdp.type)
             put("sdp", sdp.description)
         })
@@ -361,7 +381,7 @@ class CiCareCallService: Service(), CallStateListener, WebRTCEventCallback {
      * @param candidate The ICE candidate to be sent to remote peer.
      */
     override fun onIceCandidateGenerated(candidate: IceCandidate) {
-        SocketManager.send("ICE_CANDIDATE", JSONObject().apply {
+        socketManager.send("ICE_CANDIDATE", JSONObject().apply {
             put("sdpMid", candidate.sdpMid)
             put("sdpMLineIndex", candidate.sdpMLineIndex)
             put("candidate", candidate.sdp)

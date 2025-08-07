@@ -36,6 +36,8 @@ class IncomingCallService : Service() {
 
     private val binder = LocalBinder()
 
+    private lateinit var socketManager: SocketManager
+
     inner class LocalBinder : Binder() {
         fun getService(): IncomingCallService = this@IncomingCallService
     }
@@ -45,6 +47,7 @@ class IncomingCallService : Service() {
     }
 
     override fun onCreate() {
+        socketManager = SocketManager()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -98,7 +101,7 @@ class IncomingCallService : Service() {
     }
 
     fun reject() {
-        SocketManager.send("REJECT", JSONObject().apply {})
+        socketManager.send("REJECT", JSONObject().apply {})
         val isForeground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         if (isForeground) {
             startActivity(Intent(this, ScreenCallActivity::class.java).apply {
@@ -111,8 +114,8 @@ class IncomingCallService : Service() {
     }
 
     private fun initReceive(server: String, token: String, isFromPhone: Boolean?) {
-        SocketManager.connect(server, token)
-        SocketManager.send("RINGING_CALL", JSONObject().apply {})
+        socketManager.connect(server, token)
+        socketManager.send("RINGING_CALL", JSONObject().apply {})
 
         this.isFromPhone = isFromPhone ?: false
     }

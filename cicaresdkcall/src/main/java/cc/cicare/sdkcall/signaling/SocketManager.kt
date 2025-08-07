@@ -3,6 +3,7 @@ package cc.cicare.sdkcall.signaling
 import android.util.Log
 import cc.cicare.sdkcall.event.CallStateListener
 import cc.cicare.sdkcall.event.CallState
+import cc.cicare.sdkcall.rtc.WebRTCManager
 import cc.cicare.sdkcall.signaling.SignalingHelper
 import io.socket.client.IO
 import io.socket.client.Socket
@@ -17,17 +18,18 @@ import org.webrtc.SessionDescription
  * call control events such as HANGUP, RINGING, etc.
  *
  */
-object SocketManager {
+class SocketManager {
     private var socket: Socket? = null
     private var callStateListener: CallStateListener? = null
-    private var signalingHelper: SignalingHelper? = null
+
+    private var webRTCManager: WebRTCManager? = null
 
     fun setCallStateListener(callStateListener: CallStateListener) {
         this.callStateListener = callStateListener
     }
 
-    fun setSignalingEventListener(signalingHelper: SignalingHelper) {
-        this.signalingHelper = signalingHelper
+    fun setWebrtc(webRTCManager: WebRTCManager) {
+        this.webRTCManager = webRTCManager
     }
 
     /**
@@ -60,7 +62,7 @@ object SocketManager {
         // Event when the call is ended from either side
         socket?.on("HANGUP") { _ ->
             callStateListener?.onCallStateChanged(CallState.ENDED)
-            signalingHelper?.close()
+            webRTCManager?.close()
             socket?.disconnect()
         }
 
@@ -69,14 +71,15 @@ object SocketManager {
             //callEventListener.onCallStateChanged(CallState.CONNECTING)
             val json = args[0] as JSONObject
             val sdpString = json.getString("sdp")
-            if (signalingHelper == null) {
+            if (webRTCManager == null) {
                 Log.e("SocketManager", "SignalingHelper is null! Cannot initRTC")
             } else {
-                signalingHelper?.initRTC()
+                webRTCManager?.init()
+                webRTCManager?.initMic()
             }
 
             val sdp = SessionDescription(SessionDescription.Type.OFFER, sdpString)
-            signalingHelper?.setRemoteDescription(sdp)
+            webRTCManager?.setRemoteDescription(sdp)
         }
 
         // Ringing event sent to callee to indicate incoming call
@@ -91,7 +94,7 @@ object SocketManager {
             val sdpString = json.getString("sdp")
             Log.i("SDP_ANSWER", sdpString)
             val sdp = SessionDescription(SessionDescription.Type.ANSWER, sdpString)
-            signalingHelper?.setRemoteDescription(sdp)
+            webRTCManager?.setRemoteDescription(sdp)
         }
     }
 
